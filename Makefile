@@ -195,8 +195,9 @@ UPROGS=\
 	$U/_logstress\
 	$U/_forphan\
 	$U/_dorphan\
-        $U/_uptime\
         $U/_find\
+	$U/_uptime\
+	$U/_sandbox\
 
 ifeq ($(LAB),syscall)
 UPROGS += \

@@ -6,6 +6,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "vm.h"
+#include "syscall.h"
 
 uint64
 sys_exit(void)
@@ -104,4 +105,23 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+   
+uint64
+sys_interpose(void)
+{
+    int mask;
+    char path[128];
+
+    // get first argument (mask) — argint returns void in this lab
+    argint(0, &mask);
+
+    // get second argument (path) — ignored for now
+    argstr(1, path, sizeof(path));
+
+    // store mask in current process
+    struct proc *p = myproc();
+    p->syscall_mask = mask;
+
+    return 0;
 }

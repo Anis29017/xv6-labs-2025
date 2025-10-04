@@ -145,7 +145,7 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+  p->syscall_mask = 0;  // new processes start with no blocked syscalls
   return p;
 }
 
@@ -272,7 +272,7 @@ kfork(void)
     return -1;
   }
   np->sz = p->sz;
-
+  np->syscall_mask = p->syscall_mask;  // child inherits parent's mask
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 

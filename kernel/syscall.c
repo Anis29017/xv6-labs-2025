@@ -80,6 +80,7 @@ argstr(int n, char *buf, int max)
 }
 
 // Prototypes for the functions that handle system calls.
+extern uint64 sys_interpose(void);
 extern uint64 sys_fork(void);
 extern uint64 sys_exit(void);
 extern uint64 sys_wait(void);
@@ -125,6 +126,7 @@ static uint64 (*syscalls[])(void) = {
 [SYS_unlink]  sys_unlink,
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
+[SYS_interpose] = sys_interpose,
 [SYS_close]   sys_close,
 };
 
@@ -134,7 +136,16 @@ syscall(void)
   int num;
   struct proc *p = myproc();
 
-  num = p->trapframe->a7;
+  num = p->trapframe->a7;  // syscall number is in a7 on RISC-V
+
+if(p->syscall_mask & (1 << num)) {
+    // syscall is blocked
+    printf("%s: syscall %d blocked by interpose\n", p->name, num);
+    p->trapframe->a0 = -1;  // return -1 to user program
+    return;                  // do NOT execute the syscall
+}
+
+
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     // Use num to lookup the system call function for num, call it,
     // and store its return value in p->trapframe->a0
