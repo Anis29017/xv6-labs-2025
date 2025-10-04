@@ -1,0 +1,59 @@
+Q1. Looking at the backtrace output, which function called syscall?
+Ans. 
+The function that called syscall() is usertrap(). Evidence in screenshots pdf
+#0  syscall() at kernel/syscall.c:133  
+#1  0x0000000080001a9c in usertrap() at kernel/trap.c:68  
+#2  0x0000003ffffff09c in ?? ()
+
+Q2.What is the value of p->trapframe->a7 and what does that value represent? (Hint: look at user/init.c, the first user program xv6 starts, and its compiled assembly user/init.asm.)
+
+Ans. 
+The value of p->trapframe->a7 is 0x11 (decimal 17).
+This represents the system call number for mknod, which the init process executes to create device files such as /dev/console during early boot.
+
+// System call numbers
+#define SYS_fork    1
+#define SYS_exit    2
+#define SYS_wait    3
+#define SYS_pipe    4
+#define SYS_read    5
+#define SYS_kill    6
+#define SYS_exec    7
+#define SYS_fstat   8
+#define SYS_chdir   9
+#define SYS_dup    10
+#define SYS_getpid 11
+#define SYS_sbrk   12
+#define SYS_pause  13
+#define SYS_uptime 14
+#define SYS_open   15
+#define SYS_write  16
+#define SYS_mknod  17
+#define SYS_unlink 18
+#define SYS_link   19
+#define SYS_mkdir  20
+#define SYS_close  21
+
+
+Q3.What was the previous mode that the CPU was in?
+Ans.
+p /x $sstatus = 0x200000022. The SPP bit (bit 8) is 0, so the CPU was previously in user mode.
+
+
+Q4.Write down the assembly instruction the kernel is panicing at. Which register corresponds to the variable num?
+Ans.
+The kernel panics at instruction address 0x80001cee, where it executes
+lw a3,0(zero) — a load from memory address 0.
+This corresponds to the C statement num = *(int *)0;.
+The register corresponding to num is a3.
+
+
+Q5.Why does the kernel crash? Hint: look at figure 3-3 in the text; is address 0 mapped in the kernel address space? Is that confirmed by the value in scause above? (See description of scause in RISC-V privileged instructions)
+Ans.
+The kernel crashes because it tries to dereference the null pointer (*(int *)0), i.e., access memory address 0, which is not mapped in the kernel address space. This causes a load page fault (scause = 0xd, stval = 0x0), leading xv6 to panic with kerneltrap.
+
+
+Q6.What is the name of the process that was running when the kernel paniced? What is its process id (pid)?
+Ans.
+→ init (pid = 1)
+That’s the very first user process xv6 runs.
