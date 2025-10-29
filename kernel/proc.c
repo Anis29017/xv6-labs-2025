@@ -16,6 +16,7 @@ int nextpid = 1;
 struct spinlock pid_lock;
 
 extern void forkret(void);
+
 static void freeproc(struct proc *p);
 
 extern char trampoline[]; // trampoline.S
@@ -139,7 +140,25 @@ found:
     release(&p->lock);
     return 0;
   }
+char *usys_pg = kalloc();
+if(usys_pg == 0){
+  freeproc(p);
+  release(&p->lock);
+  return 0;
+}
+memset(usys_pg, 0, PGSIZE);
 
+// Store the PID in the shared struct
+struct usyscall *u = (struct usyscall *)usys_pg;
+u->pid = p->pid;
+
+// Map the page into the process's address space as read-only
+if(mappages(p->pagetable, USYSCALL, PGSIZE, (uint64)usys_pg, PTE_R | PTE_U) != 0){
+  kfree(usys_pg);
+  freeproc(p);
+  release(&p->lock);
+  return 0;
+}
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
