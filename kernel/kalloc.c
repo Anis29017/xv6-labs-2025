@@ -9,6 +9,14 @@
 #include "riscv.h"
 #include "defs.h"
 
+#define SUPERPGSIZE (2*1024*1024)
+#define N_SUPER 8
+
+static struct spinlock superlock;
+static void *super_free[N_SUPER];
+static int super_free_cnt = 0;
+
+
 void freerange(void *pa_start, void *pa_end);
 
 extern char end[]; // first address after kernel.
@@ -28,6 +36,12 @@ kinit()
 {
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
+  initlock(&superlock, "super");
+for (int i = 0; i < N_SUPER; i++) {
+  super_free[i] = (void*)(PHYSTOP - (i+1)*SUPERPGSIZE);
+  super_free_cnt++;
+}
+
 }
 
 void
@@ -79,4 +93,21 @@ kalloc(void)
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
+}
+
+
+void* superalloc(void) {
+  acquire(&superlock);
+  void *r = 0;
+  if(super_free_cnt > 0)
+    r = super_free[--super_free_cnt];
+  release(&superlock);
+  return r;
+}
+
+void superfree(void *pa) {
+  acquire(&superlock);
+  if(super_free_cnt < N_SUPER)
+    super_free[super_free_cnt++] = pa;
+  release(&superlock);
 }

@@ -8,6 +8,11 @@
 #include "proc.h"
 #include "fs.h"
 
+
+#define SUPERPGSIZE (2*1024*1024)
+#define SUPERPG_PAGES (SUPERPGSIZE/PGSIZE)
+
+
 /*
  * the kernel's page table.
  */
@@ -173,6 +178,20 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   return 0;
 }
 
+
+int mappages_super(pagetable_t pagetable, uint64 va, uint64 pa, int perm) {
+  if((va % SUPERPGSIZE) || (pa % SUPERPGSIZE))
+    panic("mappages_super: not aligned");
+
+  pte_t *pte1 = &pagetable[PX(2, va)]; // level-1 entry
+  if(*pte1 & PTE_V)
+    panic("mappages_super: already mapped");
+
+  *pte1 = PA2PTE(pa) | perm | PTE_V | PTE_R; // R=leaf indicator
+  return 0;
+}
+
+
 // create an empty user page table.
 // returns 0 if out of memory.
 pagetable_t
@@ -198,6 +217,15 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   if((va % PGSIZE) != 0)
     panic("uvmunmap: not aligned");
 
+// detect superpage at level-1
+if(level==1 && (pte & (PTE_R|PTE_W|PTE_X))){
+  uint64 pa = PTE2PA(pte);
+  superfree((void*)pa);
+  *pte = 0;
+  continue;
+}
+
+
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0) // leaf page table entry allocated?
       continue;   
@@ -222,7 +250,19 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
   if(newsz < oldsz)
     return oldsz;
 
-  oldsz = PGROUNDUP(oldsz);
+if ((a % SUPERPGSIZE == 0) && (newsz - a >= SUPERPGSIZE)) {
+  char *spa = superalloc();
+  if(spa){
+    memset(spa, 0, SUPERPGSIZE);
+    if(mappages_super(pagetable, a, (uint64)spa, PTE_W | PTE_U) == 0){
+      a += SUPERPGSIZE - PGSIZE; // skip ahead
+      continue;
+    } else {
+  superfree(spa);
+    }
+  }
+}
+   oldsz = PGROUNDUP(oldsz);
   for(a = oldsz; a < newsz; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){
@@ -326,6 +366,17 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   uint64 pa, i;
   uint flags;
   char *mem;
+
+// detect superpage leaf (level-1)
+if(level==1 && (pte & (PTE_R|PTE_W|PTE_X))){
+  uint64 pa = PTE2PA(pte);
+  char *spa = superalloc();
+  if(spa == 0) return -1;
+  memmove(spa, (char*)pa, SUPERPGSIZE);
+  mappages_super(child, va, (uint64)spa, PTE_FLAGS(pte));
+  continue;
+}
+
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
