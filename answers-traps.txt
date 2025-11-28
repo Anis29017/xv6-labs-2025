@@ -1,0 +1,51 @@
+1. Which registers contain arguments to functions?
+Which register holds 13 in main’s call to printf?
+RISC-V passes arguments in registers a0–a7.
+In main’s call to printf, the value 13 is in a2.
+
+2. Where is the call to f in the assembly code for main? Where is the call to g?
+There is no call to f and no call to g.
+Both functions are inlined by the compiler, so no jal/jalr instructions appear for them.
+
+3. At what address is the function printf located?
+(Insert the address listed next to <printf> in your call.asm, e.g.)
+0x000000000000xxxx
+
+4. What value is in the register ra just after the jalr to printf in main?
+ra contains the address of the instruction immediately after the jalr to printf:
+<the next instruction’s address from call.asm>
+
+5. Output of the code
+
+unsigned int i = 0x00646c72;
+printf("H%x Wo%s", 57616, (char *) &i);
+
+
+Output:
+
+HE110 World
+
+
+Explanation: RISC-V is little-endian, so i in memory becomes bytes 72 6c 64 00, which is the string "rld".
+
+6. If the machine were big-endian, what value should i have to produce the same output? Do we need to change 57616?
+For big-endian the bytes must be ordered 72 6c 64 00, so:
+
+i = 0x726c6400
+
+
+The value 57616 does not change.
+
+7. In the following code, what is printed after “y=”? Why?
+
+printf("x=%d y=%d", 3);
+
+
+The output is:
+
+x=3 y=<garbage value>
+
+
+Reason: The format string requires two integers, but only one argument is provided.
+printf reads the non-existent second argument from whatever garbage value is in register a2.
+This is undefined behavior.
